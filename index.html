@@ -4,6 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Task Management App</title>
+    
+    <!-- PWA用の設定 -->
+    <meta name="theme-color" content="#3b82f6">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/906/906334.png">
+    <link rel="manifest" id="manifest-link">
+
     <!-- Tailwind CSSの読み込み -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -36,16 +44,16 @@
                 <h1 class="text-xl font-bold text-slate-900">TaskFlow</h1>
             </div>
             
-            <!-- ユーザー情報とログアウトボタン (ログイン時に表示) -->
-            <div id="user-info-container" class="hidden flex items-center gap-4">
-                <div class="flex items-center gap-2">
-                    <img id="user-avatar" src="" alt="User Avatar" class="w-8 h-8 rounded-full border border-slate-200">
-                    <span id="user-name" class="text-sm font-medium hidden sm:block"></span>
-                </div>
-                <button id="logout-btn" class="text-sm text-slate-600 hover:text-slate-900 transition-colors font-medium px-3 py-1.5 rounded-md hover:bg-slate-100">
-                    ログアウト
+            <div class="flex items-center gap-4">
+                <!-- PWAインストールボタン -->
+                <button id="install-btn" class="hidden text-sm bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors font-medium px-3 py-1.5 rounded-md flex items-center gap-1 border border-blue-200 shadow-sm">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                    <span class="hidden sm:inline">アプリを追加</span>
                 </button>
-            </div>
+
+                <!-- ユーザー情報とログアウトボタン (ログイン時に表示) -->
+                <div id="user-info-container" class="hidden flex items-center gap-4">
+                    <div class="flex items-center gap-2">
         </div>
     </header>
 
@@ -165,6 +173,58 @@
         // グローバルな状態管理
         let currentUser = null;
         let unsubscribeTasks = null; // リスナーの解除用関数を保持
+        let deferredPrompt = null; // PWAインストールプロンプト用
+
+        // ==========================================
+        // PWA (Progressive Web App) の設定
+        // ==========================================
+        
+        // 1. 動的マニフェストの生成 (1つのHTMLファイルで完結させるためのハック)
+        const manifest = {
+            "name": "TaskFlow - タスク管理",
+            "short_name": "TaskFlow",
+            "start_url": ".",
+            "display": "standalone",
+            "background_color": "#f8fafc",
+            "theme_color": "#3b82f6",
+            "description": "シンプルなタスク管理アプリ",
+            "icons": [
+                {
+                    "src": "https://cdn-icons-png.flaticon.com/512/906/906334.png",
+                    "sizes": "512x512",
+                    "type": "image/png"
+                }
+            ]
+        };
+        // JSONをBlobに変換し、URLを生成してlinkタグにセット
+        const manifestBlob = new Blob([JSON.stringify(manifest)], {type: 'application/manifest+json'});
+        document.getElementById('manifest-link').href = URL.createObjectURL(manifestBlob);
+
+        // 2. インストールプロンプトの制御
+        const installBtn = document.getElementById('install-btn');
+        window.addEventListener('beforeinstallprompt', (e) => {
+            // デフォルトのインストールバナーを非表示
+            e.preventDefault();
+            // イベントを保持
+            deferredPrompt = e;
+            // ヘッダーにインストールボタンを表示
+            installBtn.classList.remove('hidden');
+        });
+
+        installBtn.addEventListener('click', async () => {
+            if (!deferredPrompt) return;
+            
+            // プロンプトを表示
+            deferredPrompt.prompt();
+            
+            // ユーザーの選択を待つ
+            const { outcome } = await deferredPrompt.userChoice;
+            console.log(`PWA Installation outcome: ${outcome}`);
+            
+            // プロンプトは1回しか使えないためクリアし、ボタンを隠す
+            deferredPrompt = null;
+            installBtn.classList.add('hidden');
+        });
 
         // ==========================================
         // 認証関連の処理
